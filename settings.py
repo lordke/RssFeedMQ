@@ -27,9 +27,9 @@ LOG_FORMAT = '%(asctime)s - %(levelname)s: %(name)s: %(message)s'
 # Postgresql database settings
 pg_db_host = "localhost"
 pg_db_port = 5432
-pg_db_dbname = "yuqingdemo"
-pg_db_username = "postgres"
-pg_db_password = "beijing2012"
+pg_db_dbname = "rssdata"
+pg_db_username = "joe"
+pg_db_password = "password"
 pg_db_dsn = "host=%(host)s port=%(port)s dbname=%(dbname)s user=%(username)s password=%(password)s" % {
     "host": pg_db_host,
     "port": pg_db_port,
