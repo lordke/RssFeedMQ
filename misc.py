@@ -1,3 +1,4 @@
+#coding=utf-8
 import os
 import sys
 import re
@@ -13,7 +14,7 @@ from pprint import pformat, pprint
 import hashlib
 import csv, codecs, cStringIO
 import rfc822
-import redis
+#import redis
 import simplejson
 
 import settings

@@ -1,4 +1,5 @@
 #!/bin/env python
+#coding=utf-8
 import os
 import sys
 import socket
@@ -6,7 +7,7 @@ import optparse
 from threading import Thread
 import time
 from datetime import datetime, timedelta
-from dateutil import tz
+#from dateutil import tz
 import psycopg2
 import psycopg2.extras
 from pprint import pprint, pformat
@@ -493,7 +494,7 @@ class NewsFeedMaggot(Thread):
             LOGGER.info(sys.exc_info())
 
     def post_init(self):
-        #初始化 新建RabbitMQ 队列和exchange并绑定
+        #初始化 新建RabbitMQ 队列和exchange并绑定（2个）
         LOGGER.info('Initializing a FeedProcessor')
         #self.feedprocessor.post_init()
         LOGGER.info('Initializing a FeedProcessor completed')
