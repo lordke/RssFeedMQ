@@ -1,4 +1,5 @@
 #!/bin/env python
+#coding=utf-8
 import os
 import sys
 import socket
@@ -155,7 +156,7 @@ class Dispatcher:
         except:
             LOGGER.info('ERROR: feed cannot be parsed')
             '''
-            # 返回的值为（type，value，traceback）。
+            返回的值为（type，value，traceback）。
             它们的含义是：type获取正在处理的异常的异常类型（类对象）;
             value获取异常参数（其关联值或第二个参数raise，如果异常类型是类对象，它总是一个类实例）;
             traceback获取一个跟踪对象（参见参考手册），它将调用堆栈封装在异常最初发生的点。

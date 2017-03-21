@@ -22,6 +22,7 @@ except:
 
 import settings
 from misc import *
+import chardet
 
 
 ENTRY_NEW, ENTRY_UPDATED, ENTRY_SAME, ENTRY_ERR = range(4)
@@ -156,15 +157,20 @@ class ProcessEntry:
             
     def process(self):
         """ Process a post in a feed and saves it in the database if necessary.
-            处理单个报文，并在需要时存储到 数据库中
+            处理单个报文，
+            首先从entry中获取link, title, guid , author_detail(name, email),creater,content(summary,description),modified_parsed,commerts，tags等
+            查看是否命中关键词
+            然后检查guid 来查看post状态（Entry_update , Entry_same , Entry_new（返回post））
+            更新 post tag表
+             获取并在需要时存储到 数据库中
         """
         (link, title, guid, author, author_email, content, date_modified, 
          fcat, comments) = self.get_entry_data()
         
-        hitted_track_ids = self.can_save_post(title, content) #关键词命中
-        if hitted_track_ids == []:
-            LOGGER.info('This post has no interesting stuff. So discard it.')
-            return None, None
+        #hitted_track_ids = self.can_save_post(title, content) #关键词命中
+        #if hitted_track_ids == []:                            #关键词未命中，删除
+        #    LOGGER.info('This post has no interesting stuff. So discard it.')
+        #    return None, None
 
         LOGGER.debug(u'Entry\n' \
                    u'  title: %s\n' \
@@ -176,37 +182,38 @@ class ProcessEntry:
                 title, link, guid, author, author_email,
                 u' '.join(tag['name'] for tag in fcat)))
 
+
         if guid in self.post_dict: #entry与现有entry重复
             print '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!111guid in self.post_dict'
-            tobj = self.post_dict['guid']
-            if tobj.content != content or (date_modified and
-                    tobj.date_modified != date_modified):
-                retval = ENTRY_UPDATED #标记为 文章更新状态
-                if self.options.verbose:
-                    prints('[%d] Updating existing post: %s' % (
-                           self.feed.id, link))
-                if not date_modified:
-                    # damn non-standard feeds
-                    date_modified = tobj.date_modified
-                tobj.title = title
-                tobj.link = link
-                tobj.content = content
-                tobj.guid = guid
-                tobj.date_modified = date_modified
-                tobj.author = author
-                tobj.author_email = author_email
-                tobj.comments = comments
-                tobj.tags.clear()
-                [tobj.tags.add(tcat) for tcat in fcat]
+            # tobj = self.post_dict[guid]
+            # if tobj.content != content or (date_modified and
+            #         # tobj.date_modified != date_modified):
+                #retval = ENTRY_UPDATED #标记为 文章更新状态
+                # if self.options.verbose:
+                #     prints('[%d] Updating existing post: %s' % (
+                #            self.feed.id, link))
+                # if not date_modified:
+                #     # damn non-standard feeds
+                #     date_modified = tobj.date_modified
+                # tobj.title = title
+                # tobj.link = link
+                # tobj.content = content
+                # tobj.guid = guid
+                # tobj.date_modified = date_modified
+                # tobj.author = author
+                # tobj.author_email = author_email
+                # tobj.comments = comments
+                # tobj.tags.clear()
+                # [tobj.tags.add(tcat) for tcat in fcat]
                 #tobj.save()
                 ############################################
                 #publish_to_redis(title, link, content, guid, date_modified, author)
                 #detect_monitored_item2(tobj)
                 
                 ############################################
-            else:
-                retval = ENTRY_SAME #文章未更新状态
-                LOGGER.info('[Feed id: %d] Post has not changed: %s' % (self.feed.id, link))
+            # else:
+            retval = ENTRY_SAME #文章未更新状态
+            #LOGGER.info('[Feed id: %d] Post has not changed: %s' % (self.feed.id, link))
             post = None
         else:
             # execute this
@@ -256,7 +263,7 @@ class ProcessEntry:
                 # "feedjack_tag".
                 for tcat in fcat:
                     # Get or create a "feedjack_tag" record according to tcat
-                    #获取或创建feedjack_tag 并创造eedjack_post_tags表
+                    #获取或创建feedjack_tag 并创造feedjack_post_tags表
                     tag_id = None
                     tag_name = tcat['name']
                     cursor.execute("SELECT id FROM feedjack_tag WHERE name=%s", (tag_name,))
@@ -288,7 +295,7 @@ class ProcessEntry:
                 
             post = {'post_id': post_id,
                     'feed_id': self.feed['id'],
-                    'track_id_list': hitted_track_ids,
+                    #'track_id_list': hitted_track_ids,
                     'title': title,
                     'link': link,
                     'content': content,
@@ -307,7 +314,7 @@ class ProcessEntry:
         for track_id, trackedphrases in TRACK_DICT.iteritems():
             hitted = 0
             for trackedphrase in trackedphrases:
-                terms = trackedphrase['name'].split(' ')
+                terms = trackedphrase['name'].split(' ') #trackedphrase 是一堆话，terms是一句话，term是一个单词，
                 for term in terms:
                     if term in title or term in content:
                         hitted += 1
@@ -340,7 +347,8 @@ class ProcessFeed():
             self.feed['last_modified'] = mtime(data['modified'])
         except:
             #pass
-            self.feed['last_modified'] = data['last_modified']
+            #self.feed['last_modified'] = data['last_modified']
+            self.feed['last_modified']=''
         
         self.feed['title'] = data['feed'].get('title', '')[0:254]
         self.feed['tagline'] = data['feed'].get('tagline', '')
@@ -375,13 +383,13 @@ class ProcessFeed():
             LOGGER.info(sys.exc_info())
         LOGGER.info('Updating "feedjack_feed" table in database completed')
         
-        # Get guids
+        # Get guids 并将新的post返回
         guids = []
         for entry in data['entries']: # rss feed中的不同 条目
             if entry.get('id', ''):
                 guids.append(entry.get('id', ''))
             elif 'title' in entry:
-                guids.append(entry['title'])
+                guids.append(entry['title']) #主要使用title来区别各条目
             elif 'link' in entry:
                 guids.append(entry['link'])
         
@@ -402,20 +410,20 @@ class ProcessFeed():
                                (self.feed['id'], tuple(guids)))
                 results = cursor.fetchall()
                 for result in results:
-                    existing_posts[result['guid']] = {'id': result['id'],
+                    existing_posts[result['guid'].decode('utf-8')] = {'id': result['id'],
                                                 'feed_id': result['feed_id'],
-                                                'title': result['title'],
-                                                'link': result['link'],
-                                                'content': result['content'],
-                                                'guid': result['guid'],
-                                                'author': result['author'],
-                                                'author_email': result['author_email'],
-                                                'comments': result['comments'],
+                                                'title': result['title'].decode('utf-8'),
+                                                'link': result['link'].decode('utf-8'),
+                                                'content': result['content'].decode('utf-8'),
+                                                'guid': result['guid'].decode('utf-8'),
+                                                'author': result['author'].decode('utf-8'),
+                                                'author_email': result['author_email'].decode('utf-8'),
+                                                'comments': result['comments'].decode('utf-8'),
                                                 'date_modified': result['date_modified']}
             except:
                 DB_CONN.rollback()
                 LOGGER.info(sys.exc_info())
-                
+
         entries_status = {ENTRY_NEW: 0,
                           ENTRY_UPDATED: 0,
                           ENTRY_SAME: 0,
@@ -567,7 +575,7 @@ class NewsFeedMaggot(Thread):
         self.start()
     ###############################   
     def declare_exchange2(self):
-        LOGGER.info('Declaring an exchange')
+        LOGGER.info('Declaring an exchange2')
         self.channel.exchange_declare(exchange=settings.RABBITMQ_NEWSFEED_ENTRY_EXCHANGE_NAME,
                         exchange_type=settings.RABBITMQ_NEWSFEED_ENTRY_EXCHANGE_TYPE,
                         passive=settings.RABBITMQ_NEWSFEED_ENTRY_EXCHANGE_PASSIVE,
@@ -579,11 +587,11 @@ class NewsFeedMaggot(Thread):
                         callback=self.on_exchange_declared2) # Call this method on Exchange.DeclareOk
 
     def on_exchange_declared2(self, frame):
-        LOGGER.info('Declaring an exchange completed')
+        LOGGER.info('Declaring an exchange2 completed')
         self.declare_queue2()
 
     def declare_queue2(self):
-        LOGGER.info('Declaring a queue')
+        LOGGER.info('Declaring a queue2')
         self.channel.queue_declare(callback=self.on_queue_declared2,
                            queue=settings.RABBITMQ_NEWSFEED_ENTRY_QUEUE_NAME,
                            passive=settings.RABBITMQ_NEWSFEED_ENTRY_QUEUE_PASSIVE, 
@@ -594,11 +602,11 @@ class NewsFeedMaggot(Thread):
                            arguments=None)
 
     def on_queue_declared2(self, method_frame):
-        LOGGER.info('Declaring a queue completed')
+        LOGGER.info('Declaring a queue2 completed')
         self.bind_queue2()
         
     def bind_queue2(self):
-        LOGGER.info('Binding a queue')
+        LOGGER.info('Binding a queue2')
         self.channel.queue_bind(callback=self.on_queue_binded2, 
                                 queue=settings.RABBITMQ_NEWSFEED_ENTRY_QUEUE_NAME,
                                 exchange=settings.RABBITMQ_NEWSFEED_ENTRY_EXCHANGE_NAME,
@@ -691,6 +699,7 @@ class NewsFeedMaggotMgr(Thread):
                 continue
 
 def main():
+    print  "OK"
     logging.basicConfig(level=logging.INFO, format=settings.LOG_FORMAT)
     mgr = NewsFeedMaggotMgr()
     #newsfeedmaggot管理类
